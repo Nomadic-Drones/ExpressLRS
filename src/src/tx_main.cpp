@@ -1485,6 +1485,17 @@ void setup()
 
   devicesStart();
 
+  // Initialize all channels to center, CH5 (AUX1) to disarmed
+  for (int i = 0; i < CRSF_NUM_CHANNELS; i++)
+    ChannelData[i] = CRSF_CHANNEL_VALUE_MID;
+  ChannelData[AUX1] = CRSF_CHANNEL_VALUE_MIN; // CH5 = disarmed
+
+  // Start RF transmission in standalone mode (no CRSF handset connected)
+  // Use hwTimer::resume() directly instead of UARTconnected() to avoid
+  // setting webserverPreventAutoStart (which blocks WiFi auto-start)
+  connectionState = disconnected;
+  hwTimer::resume();
+
   if (firmwareOptions.is_airport)
   {
     config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
@@ -1513,6 +1524,14 @@ void loop()
 
   // Update UI devices
   devicesUpdate(now);
+
+  // Button arm: GPIO0 (active LOW) -> CH5/AUX1 armed or disarmed
+  if (GPIO_PIN_BUTTON != UNDEF_PIN)
+  {
+    ChannelData[AUX1] = (digitalRead(GPIO_PIN_BUTTON) == LOW)
+      ? CRSF_CHANNEL_VALUE_MAX   // button held  = armed  (1811)
+      : CRSF_CHANNEL_VALUE_MIN;  // button released = disarmed (172)
+  }
 
   // Not a device because it must be run on the loop core
   checkBackpackUpdate();

@@ -1297,7 +1297,7 @@ static int timeout()
   #if defined(TARGET_TX)
   // if webupdate was requested before or .wifi_auto_on_interval has elapsed but uart is not detected
   // start webupdate, there might be wrong configuration flashed.
-  if(firmwareOptions.wifi_auto_on_interval != -1 && webserverPreventAutoStart == false && connectionState < wifiUpdate && !wifiStarted){
+  if(firmwareOptions.wifi_auto_on_interval != -1 && webserverPreventAutoStart == false && connectionState < wifiUpdate && connectionState != connected && !wifiStarted){
     DBGLN("No CRSF ever detected, starting WiFi");
     setWifiUpdateMode();
     return DURATION_IMMEDIATELY;
