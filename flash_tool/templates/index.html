@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EP2 Flash Tool</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --border:  #30363d;
+      --accent:  #f78166;
+      --green:   #3fb950;
+      --yellow:  #d29922;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --font:    'Inter', system-ui, -apple-system, sans-serif;
+      --mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px 60px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .header svg { flex-shrink: 0; }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .header p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Form ── */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .field { margin-bottom: 18px; }
+
+    input[type="text"], select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 14px;
+      font-family: var(--mono);
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent);
+    }
+    select option { background: var(--surface); }
+
+    .port-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .port-row select { flex: 1; }
+
+    .btn-refresh {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Flash button ── */
+    #flashBtn {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #0d1117;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: opacity .2s;
+      margin-top: 6px;
+    }
+    #flashBtn:disabled { opacity: .45; cursor: not-allowed; }
+    #flashBtn:not(:disabled):hover { opacity: .88; }
+
+    /* ── Progress ── */
+    #progressWrap {
+      margin-top: 22px;
+      display: none;
+    }
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    #statusText {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    #pct { font-size: 13px; font-weight: 700; color: var(--accent); }
+
+    .bar-bg {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    #bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width .3s ease;
+    }
+    #bar.done   { background: var(--green); }
+    #bar.failed { background: var(--yellow); }
+
+    /* ── Log ── */
+    #logWrap {
+      margin-top: 18px;
+      display: none;
+    }
+    #log {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      height: 220px;
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    #log .err  { color: var(--yellow); }
+    #log .ok   { color: var(--green); }
+    #log .info { color: var(--text); }
+
+    /* ── Done banner ── */
+    #doneBanner {
+      display: none;
+      margin-top: 18px;
+      background: rgba(63,185,80,.12);
+      border: 1px solid rgba(63,185,80,.4);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--green);
+      text-align: center;
+    }
+
+    /* ── Scrollbar ── */
+    #log::-webkit-scrollbar { width: 5px; }
+    #log::-webkit-scrollbar-track { background: transparent; }
+    #log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Header -->
+  <div class="header">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="8" fill="#f78166" fill-opacity=".15"/>
+      <path d="M10 24l4-12h8l4 12" stroke="#f78166" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M13 20h10" stroke="#f78166" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="18" cy="13" r="2" fill="#f78166"/>
+    </svg>
+    <div>
+      <h1>EP2 Flash Tool</h1>
+      <p>HappyModel EP2 2.4GHz TX · Standalone Mode</p>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="field">
+    <label for="phrase">Binding Phrase</label>
+    <input
+      id="phrase"
+      type="text"
+      placeholder="e.g. nomadicdrones014"
+      value="{{ current_phrase }}"
+      autocomplete="off"
+      spellcheck="false"
+    />
+  </div>
+
+  <div class="field">
+    <label for="port">Serial Port</label>
+    <div class="port-row">
+      <select id="port">
+        {% if ports %}
+          {% for p in ports %}
+            <option value="{{ p.port }}">{{ p.port }} — {{ p.desc }}</option>
+          {% endfor %}
+        {% else %}
+          <option value="">No serial ports found</option>
+        {% endif %}
+      </select>
+      <button class="btn-refresh" onclick="refreshPorts()" title="Refresh ports">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+          <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <button id="flashBtn" onclick="startFlash()">⚡ Flash EP2</button>
+
+  <!-- Progress bar -->
+  <div id="progressWrap">
+    <div class="progress-header">
+      <span id="statusText">Preparing…</span>
+      <span id="pct">0%</span>
+    </div>
+    <div class="bar-bg"><div id="bar"></div></div>
+  </div>
+
+  <!-- Log output -->
+  <div id="logWrap">
+    <div style="margin-bottom:6px; margin-top:4px;">
+      <label style="margin:0">Log</label>
+    </div>
+    <div id="log"></div>
+  </div>
+
+  <!-- Done banner -->
+  <div id="doneBanner">✓ Flash complete — EP2 is ready!</div>
+
+</div>
+
+<script>
+  async function refreshPorts() {
+    const res = await fetch('/ports');
+    const ports = await res.json();
+    const sel = document.getElementById('port');
+    sel.innerHTML = ports.length
+      ? ports.map(p => `<option value="${p.port}">${p.port} — ${p.desc}</option>`).join('')
+      : '<option value="">No serial ports found</option>';
+  }
+
+  function appendLog(text, cls) {
+    const log = document.getElementById('log');
+    const line = document.createElement('span');
+    if (cls) line.className = cls;
+    line.textContent = text + '\n';
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function setProgress(pct, label) {
+    const bar = document.getElementById('bar');
+    const pctEl = document.getElementById('pct');
+    const statusEl = document.getElementById('statusText');
+    bar.style.width = pct + '%';
+    pctEl.textContent = pct + '%';
+    if (label) statusEl.textContent = label;
+  }
+
+  async function startFlash() {
+    const phrase = document.getElementById('phrase').value.trim();
+    const port = document.getElementById('port').value;
+    const btn = document.getElementById('flashBtn');
+
+    if (!phrase) { alert('Enter a binding phrase first.'); return; }
+    if (!port)   { alert('Select a serial port first.'); return; }
+
+    // Reset UI
+    btn.disabled = true;
+    document.getElementById('progressWrap').style.display = 'block';
+    document.getElementById('logWrap').style.display = 'block';
+    document.getElementById('doneBanner').style.display = 'none';
+    document.getElementById('log').innerHTML = '';
+    const bar = document.getElementById('bar');
+    bar.className = '';
+    bar.style.width = '0%';
+    document.getElementById('pct').textContent = '0%';
+    document.getElementById('statusText').textContent = 'Starting…';
+
+    // POST to start flash
+    const fd = new FormData();
+    fd.append('phrase', phrase);
+    fd.append('port', port);
+
+    const res = await fetch('/flash', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (json.error) {
+      appendLog('Error: ' + json.error, 'err');
+      bar.className = 'failed';
+      btn.disabled = false;
+      return;
+    }
+
+    // Open SSE stream
+    const es = new EventSource('/flash/stream');
+
+    es.addEventListener('log', e => {
+      const t = e.data;
+      const cls = t.toLowerCase().includes('error') || t.toLowerCase().includes('fail')
+        ? 'err'
+        : t.toLowerCase().includes('success') || t.toLowerCase().includes('complete')
+          ? 'ok'
+          : '';
+      appendLog(t, cls);
+    });
+
+    es.addEventListener('progress', e => {
+      const pct = parseInt(e.data);
+      let label = 'Building firmware…';
+      if (pct >= 45 && pct < 50) label = 'Releasing port…';
+      if (pct >= 50) label = 'Flashing…';
+      if (pct === 100) label = 'Done!';
+      setProgress(pct, label);
+    });
+
+    es.addEventListener('done', e => {
+      es.close();
+      bar.className = 'done';
+      bar.style.width = '100%';
+      document.getElementById('pct').textContent = '100%';
+      document.getElementById('statusText').textContent = 'Done!';
+      document.getElementById('doneBanner').style.display = 'block';
+      appendLog('✓ ' + e.data, 'ok');
+      btn.disabled = false;
+    });
+
+    es.addEventListener('error', e => {
+      es.close();
+      bar.className = 'failed';
+      document.getElementById('statusText').textContent = 'Failed';
+      appendLog('✗ ' + (e.data || 'Flash failed'), 'err');
+      btn.disabled = false;
+    });
+
+    es.onerror = () => {
+      es.close();
+      bar.className = 'failed';
+      document.getElementById('statusText').textContent = 'Connection lost';
+      appendLog('SSE connection lost', 'err');
+      btn.disabled = false;
+    };
+  }
+</script>
+</body>
+</html>
