@@ -1490,9 +1490,9 @@ void setup()
     ChannelData[i] = CRSF_CHANNEL_VALUE_MID;
   ChannelData[AUX1] = CRSF_CHANNEL_VALUE_MIN; // CH5 = disarmed
 
-  // Start RF transmission in standalone mode (no CRSF handset connected)
-  // Use hwTimer::resume() directly instead of UARTconnected() to avoid
-  // setting webserverPreventAutoStart (which blocks WiFi auto-start)
+  // Start RF transmission in standalone mode (no CRSF handset connected).
+  // Disable WiFi auto-start permanently — no handset means no need for WiFi.
+  webserverPreventAutoStart = true;
   connectionState = disconnected;
   hwTimer::resume();
 
