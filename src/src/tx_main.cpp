@@ -1411,6 +1411,12 @@ void setup()
 {
   if (setupHardwareFromOptions())
   {
+    // Read boot-mode button IMMEDIATELY after hardware config loads —
+    // before Radio.Begin() and other slow init that takes ~1-2s.
+    // Holding the arm button (GPIO3) during power-on → WiFi config mode.
+    bool bootWifiMode = (GPIO_PIN_BUTTON != UNDEF_PIN) &&
+                        (digitalRead(GPIO_PIN_BUTTON) == LOW);
+
     setupTarget();
     // Register the devices with the framework
     devicesRegister(ui_devices, ARRAY_SIZE(ui_devices));
@@ -1490,12 +1496,12 @@ void setup()
     ChannelData[i] = CRSF_CHANNEL_VALUE_MID;
   ChannelData[AUX1] = CRSF_CHANNEL_VALUE_MIN; // CH5 = disarmed
 
-  // Boot mode selection:
+  // Boot mode selection (button state sampled early in setup, before slow Radio init):
   // Hold the arm button (GPIO3) during power-on → WiFi config mode
   //   LED will blink WiFi pattern; connect to the EP2 access point to
   //   change binding phrase, power, rate, etc. Reboot to return to RF mode.
   // Normal boot (button not held) → standalone RF TX mode
-  if (GPIO_PIN_BUTTON != UNDEF_PIN && digitalRead(GPIO_PIN_BUTTON) == LOW)
+  if (bootWifiMode)
   {
     // WiFi config mode — devicesUpdate() detects wifiUpdate state and starts AP
     connectionState = wifiUpdate;
