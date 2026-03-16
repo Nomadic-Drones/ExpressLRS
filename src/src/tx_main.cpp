@@ -1490,11 +1490,23 @@ void setup()
     ChannelData[i] = CRSF_CHANNEL_VALUE_MID;
   ChannelData[AUX1] = CRSF_CHANNEL_VALUE_MIN; // CH5 = disarmed
 
-  // Start RF transmission in standalone mode (no CRSF handset connected).
-  // Disable WiFi auto-start permanently — no handset means no need for WiFi.
-  webserverPreventAutoStart = true;
-  connectionState = disconnected;
-  hwTimer::resume();
+  // Boot mode selection:
+  // Hold the arm button (GPIO3) during power-on → WiFi config mode
+  //   LED will blink WiFi pattern; connect to the EP2 access point to
+  //   change binding phrase, power, rate, etc. Reboot to return to RF mode.
+  // Normal boot (button not held) → standalone RF TX mode
+  if (GPIO_PIN_BUTTON != UNDEF_PIN && digitalRead(GPIO_PIN_BUTTON) == LOW)
+  {
+    // WiFi config mode — devicesUpdate() detects wifiUpdate state and starts AP
+    connectionState = wifiUpdate;
+  }
+  else
+  {
+    // Standalone RF mode — disable WiFi auto-start and begin transmitting
+    webserverPreventAutoStart = true;
+    connectionState = disconnected;
+    hwTimer::resume();
+  }
 
   if (firmwareOptions.is_airport)
   {
