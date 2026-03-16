@@ -102,18 +102,21 @@ def emit(q, event, data):
     q.put(f"event: {event}\ndata: {data}\n\n")
 
 
-def run_flash(port, phrase, q):
+def run_flash(port, phrase, force_build, q):
     """Run in a thread: optionally rebuild, then flash. Emits SSE."""
     try:
-        # ── Step 1: update phrase if changed ──────────────────────────────
+        # ── Step 1: update phrase if changed, or force rebuild ─────────────
         current = current_phrase()
-        need_build = (phrase != current)
+        need_build = force_build or (phrase != current)
 
         emit(q, "log", f"Binding phrase: {phrase}")
         emit(q, "log", f"Port: {port}")
 
         if need_build:
-            emit(q, "log", f"Phrase changed ({current!r} → {phrase!r}), rebuilding firmware…")
+            if force_build:
+                emit(q, "log", "Force rebuild requested, rebuilding firmware…")
+            else:
+                emit(q, "log", f"Phrase changed ({current!r} → {phrase!r}), rebuilding firmware…")
             set_phrase(phrase)
             emit(q, "progress", "10")
 
@@ -228,8 +231,9 @@ def flash():
     if not _flash_lock.acquire(blocking=False):
         return jsonify({"error": "Flash already in progress"}), 409
 
-    port   = request.form.get("port", "").strip()
-    phrase = request.form.get("phrase", "").strip()
+    port        = request.form.get("port", "").strip()
+    phrase      = request.form.get("phrase", "").strip()
+    force_build = request.form.get("force_build") == "1"
 
     if not port:
         _flash_lock.release()
@@ -237,13 +241,13 @@ def flash():
     if not phrase:
         _flash_lock.release()
         return jsonify({"error": "Binding phrase is required"}), 400
-    if not os.path.exists(FIRMWARE):
+    if not force_build and not os.path.exists(FIRMWARE):
         _flash_lock.release()
-        return jsonify({"error": f"firmware.bin not found at {FIRMWARE}"}), 400
+        return jsonify({"error": f"firmware.bin not found — enable Force rebuild"}), 400
 
     _flash_queue = queue.Queue()
     threading.Thread(
-        target=run_flash, args=(port, phrase, _flash_queue), daemon=True
+        target=run_flash, args=(port, phrase, force_build, _flash_queue), daemon=True
     ).start()
 
     return jsonify({"status": "started"})
@@ -253,18 +257,20 @@ def flash():
 def flash_stream():
     """SSE endpoint — streams events from the active flash queue."""
     def generate():
-        while True:
+        deadline = time.time() + 600  # 10-minute absolute timeout
+        while time.time() < deadline:
             if _flash_queue is None:
                 yield "event: error\ndata: No flash in progress\n\n"
                 return
             try:
-                msg = _flash_queue.get(timeout=60)
+                msg = _flash_queue.get(timeout=5)
                 yield msg
                 if msg.startswith("event: done") or msg.startswith("event: error"):
                     return
             except queue.Empty:
-                yield "event: error\ndata: Flash timed out\n\n"
-                return
+                # Send a keepalive comment so the browser doesn't drop the connection
+                yield ": keepalive\n\n"
+        yield "event: error\ndata: Flash timed out after 10 minutes\n\n"
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
