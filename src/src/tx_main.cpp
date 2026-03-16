@@ -1409,13 +1409,16 @@ static void cyclePower()
 
 void setup()
 {
+  // Declare here so it survives the if/else scope and is visible after devicesStart()
+  bool bootWifiMode = false;
+
   if (setupHardwareFromOptions())
   {
     // Read boot-mode button IMMEDIATELY after hardware config loads —
     // before Radio.Begin() and other slow init that takes ~1-2s.
     // Holding the arm button (GPIO3) during power-on → WiFi config mode.
-    bool bootWifiMode = (GPIO_PIN_BUTTON != UNDEF_PIN) &&
-                        (digitalRead(GPIO_PIN_BUTTON) == LOW);
+    bootWifiMode = (GPIO_PIN_BUTTON != UNDEF_PIN) &&
+                   (digitalRead(GPIO_PIN_BUTTON) == LOW);
 
     setupTarget();
     // Register the devices with the framework
