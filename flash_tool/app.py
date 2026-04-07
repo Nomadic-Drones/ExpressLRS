@@ -123,11 +123,12 @@ def run_flash(port, phrase, force_build, q):
             # ── Step 2: pio build ──────────────────────────────────────────
             pio = shutil.which("pio") or os.path.expanduser("~/.platformio/penv/bin/pio")
             proc = subprocess.Popen(
-                [pio, "run", "-e", ENV_NAME],
+                [pio, "run", "-e", ENV_NAME, "--jobs", "14"],
                 cwd=SRC_DIR,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                env={**os.environ, "PLATFORMIO_BUILD_FLAGS": os.environ.get("PLATFORMIO_BUILD_FLAGS", "")},
             )
             for line in proc.stdout:
                 emit(q, "log", line.rstrip())
@@ -170,7 +171,7 @@ def run_flash(port, phrase, force_build, q):
         emit(q, "log", f"Firmware: {FIRMWARE}")
 
         cmd_parts = esptool_cmd + [
-            "-p", port, "-b", "57600", "-c", "esp8266",
+            "-p", port, "-b", "921600", "-c", "esp8266",
             "--before", "no_reset", "--after", "soft_reset",
             "--no-stub", "write_flash", "0x0", FIRMWARE,
         ]
